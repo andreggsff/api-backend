@@ -1,0 +1,13 @@
+// api-backend/tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "rootDir": "./src", // Seus arquivos-fonte estão na pasta 'src'
+    "outDir": "./dist", // Os arquivos compilados vão para a pasta 'dist'
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true
+  }
+}
