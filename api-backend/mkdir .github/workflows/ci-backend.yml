@@ -1,47 +1,63 @@
-name: Backend CI - Build & Lint
+name: CI/CD Backend - API
 
 on:
   push:
-    branches: [ main ] 
+    branches: [ "main" ]
   pull_request:
-    branches: [ main ] 
-    
+    types: [opened, synchronize, reopened]
+
 jobs:
-  build-and-lint:
-   
+  ci:
     runs-on: ubuntu-latest
-  
     steps:
-    
-      name: Checkout Code
-      uses: actions/checkout@v4
-        
-      name: Setup Node.js
+    - uses: actions/checkout@v4
+      with:
+
+        fetch-depth: 0 
+
+    - name: Setup Node.js 20
       uses: actions/setup-node@v4
       with:
-        node-version: '20' 
-        cache: 'npm' 
-         
-       name: Install Dependencies
-       run: npm install
+        node-version: 20
+        cache: 'npm'
 
-       name: Run TypeScript Build
-        run: npm run build
-        
-        name: Run ESLint Check
-        run: npm run lint
+    - name: Install dependencies and Generate Prisma Client
 
-        name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master 
-        env:
-         
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }} 
-        with:
-          
-          args: >
-            -Dsonar.projectKey=seu-usuario_api-backend
-            -Dsonar.organization=seu-usuario
-            -Dsonar.sources=src 
-            -Dsonar.tests=src 
-            -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info
+      run: npm ci && npx prisma generate
 
+    - name: 1. Run Lint (ESLint Check)
+      run: npm run lint
+
+    - name: 2. Run Tests (Jest with Coverage)
+
+      run: npm run test -- --coverage
+
+    - name: 3. SonarCloud Scan and Quality Gate Check
+
+      uses: SonarSource/sonarcloud-github-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      with:
+        args: >
+          -Dsonar.organization=josiellyr8-byte 
+          -Dsonar.projectKey=josiellyr8-byte_api-backend
+          -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info # Liga o relatório de cobertura
+
+    - name: 4. Build TypeScript
+    
+      run: npm run build
+
+  deploy:
+    needs: ci
+
+    if: github.ref == 'refs/heads/main' && success() 
+    runs-on: ubuntu-latest
+    steps:
+    - name: Trigger Render Deploy Hook (API Web Service)
+
+      run: |
+        curl -X POST \
+        -H "Accept: application/json" \
+        -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+        https://api.render.com/v1/services/${{ secrets.RENDER_BACKEND_SERVICE_ID }}/deploys
